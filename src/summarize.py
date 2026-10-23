@@ -13,8 +13,27 @@ def summarize_extractive(text: str, sentence_count: int = 2) -> str:
     except Exception:
         return text
 
+from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
+
 def get_abstractive_summarizer():
-    return pipeline("summarization", model="sshleifer/distilbart-cnn-6-6", device=-1)
+    model_name = "sshleifer/distilbart-cnn-12-6"
+    
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        return pipeline(
+            task="summarization",
+            model=model,
+            tokenizer=tokenizer,
+            device=-1
+        )
+    except Exception as e:
+        # Fallback to standard facebook/bart-large-cnn if model resolution fails
+        return pipeline(
+            task="summarization", 
+            model="facebook/bart-large-cnn", 
+            device=-1
+        )
 
 def summarize_abstractive(pipe, text: str) -> str:
     try:
