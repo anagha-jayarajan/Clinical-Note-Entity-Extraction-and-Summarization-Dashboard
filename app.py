@@ -1,11 +1,12 @@
 import streamlit as st
 import warnings
+import gc
 
-# Suppress harmless warnings
+# Suppress non-fatal warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# 1. Page Configuration (Must be first Streamlit call)
+# 1. Page Configuration
 st.set_page_config(
     page_title="Clinical NLP Studio",
     page_icon="🏥",
@@ -27,7 +28,34 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Main Entry Point with Exception Handling
+# 2. Resource Caching Loaders
+@st.cache_resource(show_spinner=False)
+def load_spacy_model():
+    from src.extract import load_nlp_pipeline
+    return load_nlp_pipeline()
+
+@st.cache_resource(show_spinner=False)
+def load_transformer_summarizer():
+    from src.summarize import get_abstractive_summarizer
+    return get_abstractive_summarizer()
+
+@st.cache_data(show_spinner=False)
+def get_clean_dataset():
+    from src.preprocess import load_and_clean_data
+    return load_and_clean_data()
+
+def init_database_if_needed(df):
+    from src.db import init_db, populate_db, get_connection
+    init_db()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM notes")
+    count = cursor.fetchone()[0]
+    conn.close()
+    
+    if count == 0:
+        populate_db(df)
+
 def main():
     st.markdown("""
         <div class="header-box">
@@ -36,31 +64,12 @@ def main():
         </div>
     """, unsafe_allow_html=True)
 
-    # Wrap imports to prevent container crash
     try:
-        with st.spinner("Loading NLP components and database..."):
-            from src.preprocess import load_and_clean_data
-            from src.extract import load_nlp_pipeline, extract_entities
-            from src.summarize import get_abstractive_summarizer, summarize_extractive, summarize_abstractive
-            from src.db import init_db, populate_db, get_connection
-            
-            init_db()
-            df = load_and_clean_data()
-            
-            # Check DB count
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM notes")
-            count = cursor.fetchone()[0]
-            conn.close()
-            
-            if count == 0:
-                populate_db(df.head(20))
-                
+        with st.spinner("Initializing system components & dataset..."):
+            df = get_clean_dataset()
+            init_database_if_needed(df)
     except Exception as e:
-        st.error("⚠️ An error occurred while initializing application modules:")
-        st.exception(e)
-        st.info("Please fix the file import error indicated above.")
+        st.error(f"Initialization error: {e}")
         return
 
     # Navigation Sidebar
@@ -76,14 +85,16 @@ def main():
         st.subheader("Dataset Overview")
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Total Records", len(df))
+            st.metric("Total Records Loaded", len(df))
             st.bar_chart(df['medical_specialty'].value_counts().head(8))
         with col2:
-            st.dataframe(df[['note_id', 'medical_specialty', 'description']].head(10), use_container_width=True)
+            st.dataframe(df[['note_id', 'medical_specialty', 'description']].head(10), width="stretch")
 
     elif page == "🔬 Clinical Entity Extraction":
         st.subheader("Named Entity Recognition")
-        nlp = load_nlp_pipeline()
+        nlp = load_spacy_model()
+        from src.extract import extract_entities
+        
         selected_id = st.selectbox("Select Note ID:", df['note_id'].tolist())
         note_data = df[df['note_id'] == selected_id].iloc[0]
         
@@ -91,23 +102,27 @@ def main():
         if st.button("Extract Entities", type="primary"):
             entities = extract_entities(nlp, note_data['transcription'])
             if entities:
-                st.dataframe(entities, use_container_width=True)
+                st.dataframe(entities, width="stretch")
             else:
                 st.info("No entities found.")
+            gc.collect()
 
     elif page == "📝 Summarization Studio":
-        st.subheader("Summarization")
-        abs_summarizer = get_abstractive_summarizer()
+        st.subheader("Summarization Engine")
+        abs_summarizer = load_transformer_summarizer()
+        from src.summarize import summarize_extractive, summarize_abstractive
+        
         selected_id = st.selectbox("Select Note ID:", df['note_id'].tolist())
         note_data = df[df['note_id'] == selected_id].iloc[0]
         
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("**Extractive Summary**")
+            st.markdown("**Extractive Summary (TextRank)**")
             st.write(summarize_extractive(note_data['transcription']))
         with c2:
-            st.markdown("**Abstractive Summary**")
+            st.markdown("**Abstractive Summary (DistilBART)**")
             st.write(summarize_abstractive(abs_summarizer, note_data['transcription']))
+        gc.collect()
 
     elif page == "🔍 Cohort Search Engine":
         st.subheader("Cohort Search")
@@ -115,7 +130,7 @@ def main():
         if query:
             filtered = df[df['transcription'].str.contains(query, case=False, na=False)]
             st.write(f"Found **{len(filtered)}** matches.")
-            st.dataframe(filtered[['note_id', 'medical_specialty', 'description']], use_container_width=True)
+            st.dataframe(filtered[['note_id', 'medical_specialty', 'description']], width="stretch")
 
 if __name__ == "__main__":
     main()
