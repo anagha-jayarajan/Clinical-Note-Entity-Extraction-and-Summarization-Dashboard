@@ -14,8 +14,7 @@ def summarize_extractive(text: str, sentence_count: int = 2) -> str:
         return text
 
 def get_abstractive_summarizer():
-    device = 0 if torch.cuda.is_available() else -1
-    return pipeline("summarization", model="sshleifer/distilbart-cnn-12-6", device=device)
+    return pipeline("summarization", model="sshleifer/distilbart-cnn-6-6", device=-1)
 
 def summarize_abstractive(pipe, text: str) -> str:
     try:
