@@ -3,55 +3,77 @@ import pandas as pd
 
 DB_NAME = "clinical_nlp.db"
 
-def init_db(db_path: str = DB_NAME):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("DROP TABLE IF EXISTS summaries")
-    cursor.execute("DROP TABLE IF EXISTS entities")
-    cursor.execute("DROP TABLE IF EXISTS notes")
+def get_connection():
+    """Returns a connection object to the SQLite database."""
+    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
 
+def init_db():
+    """Initializes the SQLite tables if they do not exist."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Table for raw notes
     cursor.execute("""
-        CREATE TABLE notes (
-            note_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        CREATE TABLE IF NOT EXISTS notes (
+            note_id INTEGER PRIMARY KEY,
             medical_specialty TEXT,
-            sample_name TEXT,
-            transcription TEXT
+            transcription TEXT,
+            description TEXT
         )
     """)
+    
+    # Table for extracted entities
     cursor.execute("""
-        CREATE TABLE entities (
-            entity_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        CREATE TABLE IF NOT EXISTS entities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             note_id INTEGER,
-            text TEXT,
-            label TEXT,
-            negated INTEGER,
-            cui TEXT,
-            canonical_name TEXT,
+            entity_text TEXT,
+            entity_label TEXT,
+            is_negated BOOLEAN,
             FOREIGN KEY (note_id) REFERENCES notes (note_id)
         )
     """)
+    
+    # Table for summaries
     cursor.execute("""
-        CREATE TABLE summaries (
-            summary_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            note_id INTEGER,
-            method TEXT,
-            summary TEXT,
+        CREATE TABLE IF NOT EXISTS summaries (
+            note_id INTEGER PRIMARY KEY,
+            extractive_summary TEXT,
+            abstractive_summary TEXT,
             FOREIGN KEY (note_id) REFERENCES notes (note_id)
         )
     """)
+    
     conn.commit()
     conn.close()
 
-def query_top_conditions(db_path: str = DB_NAME) -> pd.DataFrame:
-    conn = sqlite3.connect(db_path)
-    query = """
-        SELECT n.medical_specialty, e.canonical_name, COUNT(*) AS frequency
-        FROM entities e
-        JOIN notes n ON n.note_id = e.note_id
-        WHERE e.negated = 0
-        GROUP BY n.medical_specialty, e.canonical_name
-        ORDER BY frequency DESC
-    """
-    df = pd.read_sql_query(query, conn)
+def populate_db(df: pd.DataFrame, nlp, abs_summarizer):
+    """Populates the SQLite database with notes, extracted entities, and summaries."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    for _, row in df.iterrows():
+        note_id = int(row['note_id'])
+        specialty = str(row['medical_specialty'])
+        text = str(row['transcription'])
+        desc = str(row['description'])
+        
+        # Insert note
+        cursor.execute(
+            "INSERT OR REPLACE INTO notes (note_id, medical_specialty, transcription, description) VALUES (?, ?, ?, ?)",
+            (note_id, specialty, text, desc)
+        )
+        
+        # Extract and insert entities
+        doc = nlp(text)
+        for ent in doc.ents:
+            is_negated = getattr(ent._, "negex", False)
+            cursor.execute(
+                "INSERT INTO entities (note_id, entity_text, entity_label, is_negated) VALUES (?, ?, ?, ?)",
+                (note_id, ent.text, ent.label_, is_negated)
+            )
+            
+    conn.commit()
     conn.close()
-    return df
