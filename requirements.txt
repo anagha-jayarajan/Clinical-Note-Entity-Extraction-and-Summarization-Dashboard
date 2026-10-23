@@ -1,6 +1,6 @@
 streamlit
 spacy>=3.7.0,<3.8.0
-scispacy==0.5.3
+scispacy==0.5.4
 negspacy
 pandas
 matplotlib
@@ -10,4 +10,4 @@ transformers
 torch
 nltk
 rouge-score
-https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_ner_bc5cdr_md-0.5.3.tar.gz
+https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/en_ner_bc5cdr_md-0.5.4.tar.gz
