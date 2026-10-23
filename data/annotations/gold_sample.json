@@ -1,0 +1,27 @@
+[
+  {
+    "note_id": 1,
+    "medical_specialty": "Cardiovascular / Pulmonary",
+    "transcription": "Patient denies chest pain and shortness of breath. History of severe hypertension and type 2 diabetes. Prescribed metformin and lisinopril.",
+    "description": "Patient evaluated for cardiovascular risk factors including hypertension and diabetes.",
+    "gold_entities": [
+      {"text": "chest pain", "label": "DISEASE"},
+      {"text": "shortness of breath", "label": "DISEASE"},
+      {"text": "hypertension", "label": "DISEASE"},
+      {"text": "type 2 diabetes", "label": "DISEASE"},
+      {"text": "metformin", "label": "CHEMICAL"},
+      {"text": "lisinopril", "label": "CHEMICAL"}
+    ]
+  },
+  {
+    "note_id": 2,
+    "medical_specialty": "Gastroenterology",
+    "transcription": "Patient presents with severe abdominal pain. Denies hematochezia. Previous appendectomy noted. Diagnosed with mild gastritis.",
+    "description": "Gastroenterology consultation for acute abdominal pain.",
+    "gold_entities": [
+      {"text": "abdominal pain", "label": "DISEASE"},
+      {"text": "hematochezia", "label": "DISEASE"},
+      {"text": "gastritis", "label": "DISEASE"}
+    ]
+  }
+]
