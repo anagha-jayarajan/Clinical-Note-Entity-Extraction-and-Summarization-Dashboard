@@ -3,15 +3,18 @@ import pandas as pd
 import streamlit as st
 
 @st.cache_data
-def load_and_clean_data(file_path: str = "data/mtsamples.csv") -> pd.DataFrame:
+def load_and_clean_data(file_path: str = "data/raw/mtsamples.csv") -> pd.DataFrame:
     """
-    Loads, cleans, and standardizes the clinical transcription dataset.
-    Ensures that essential columns exist and missing records are safely handled.
+    Loads, cleans, and standardizes the clinical transcription dataset from data/raw/mtsamples.csv.
     """
-    # Fallback path check
+    # Fallback path checking
     if not os.path.exists(file_path):
-        # Check alternative common locations
-        alt_paths = ["mtsamples.csv", "../data/mtsamples.csv", "src/data/mtsamples.csv"]
+        alt_paths = [
+            "data/raw/mtsamples.csv",
+            "data-raw/mtsamples.csv",
+            "data/mtsamples.csv",
+            "mtsamples.csv"
+        ]
         for alt in alt_paths:
             if os.path.exists(alt):
                 file_path = alt
@@ -20,8 +23,8 @@ def load_and_clean_data(file_path: str = "data/mtsamples.csv") -> pd.DataFrame:
     try:
         df = pd.read_csv(file_path)
     except FileNotFoundError:
-        # Fallback dummy dataset if file is missing to keep container running
-        df = pd.DataFrame({
+        # Fallback dummy dataset
+        return pd.DataFrame({
             'note_id': [1, 2],
             'medical_specialty': ['Cardiology', 'Neurology'],
             'description': ['Sample clinical note description.', 'Sample neurological evaluation.'],
@@ -30,7 +33,6 @@ def load_and_clean_data(file_path: str = "data/mtsamples.csv") -> pd.DataFrame:
                 'Patient reports no history of severe headaches or seizures. Normal EEG findings.'
             ]
         })
-        return df
 
     # Standardize column names (lowercase and strip whitespace)
     df.columns = [str(col).strip().lower() for col in df.columns]
@@ -63,7 +65,7 @@ def load_and_clean_data(file_path: str = "data/mtsamples.csv") -> pd.DataFrame:
             df = df.reset_index(drop=True)
             df['note_id'] = df.index + 1
 
-    # Ensure note_id is numeric
+    # Ensure note_id is integer
     df['note_id'] = pd.to_numeric(df['note_id'], errors='coerce').fillna(0).astype(int)
 
     return df
