@@ -8,6 +8,7 @@ seaborn
 sumy
 transformers>=4.38.0,<4.45.0
 torch
+torchvision
 nltk
 rouge-score
 https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/en_ner_bc5cdr_md-0.5.4.tar.gz
