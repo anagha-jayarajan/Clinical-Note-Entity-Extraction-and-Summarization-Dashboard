@@ -1,54 +1,69 @@
+import os
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+import streamlit as st
 
-def load_and_clean_data(csv_path: str = None) -> pd.DataFrame:
-    if csv_path:
-        df = pd.read_csv(csv_path)
-    else:
-        data = {
-            'medical_specialty': [
-                'Cardiovascular / Pulmonary', 
-                'Gastroenterology', 
-                'Neurology', 
-                'Cardiovascular / Pulmonary',
-                'Orthopedic'
-            ],
-            'sample_name': [
-                'Consult - Chest Pain', 
-                'Colonoscopy Report', 
-                'Headache Evaluation', 
-                'Postop Follow-up',
-                'Knee Pain Exam'
-            ],
+@st.cache_data
+def load_and_clean_data(file_path: str = "data/mtsamples.csv") -> pd.DataFrame:
+    """
+    Loads, cleans, and standardizes the clinical transcription dataset.
+    Ensures that essential columns exist and missing records are safely handled.
+    """
+    # Fallback path check
+    if not os.path.exists(file_path):
+        # Check alternative common locations
+        alt_paths = ["mtsamples.csv", "../data/mtsamples.csv", "src/data/mtsamples.csv"]
+        for alt in alt_paths:
+            if os.path.exists(alt):
+                file_path = alt
+                break
+
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        # Fallback dummy dataset if file is missing to keep container running
+        df = pd.DataFrame({
+            'note_id': [1, 2],
+            'medical_specialty': ['Cardiology', 'Neurology'],
+            'description': ['Sample clinical note description.', 'Sample neurological evaluation.'],
             'transcription': [
-                'Patient denies chest pain and shortness of breath. History of severe hypertension and type 2 diabetes. Prescribed metformin and lisinopril.',
-                'Patient presents with severe abdominal pain. Denies hematochezia. Previous appendectomy noted. Diagnosed with mild gastritis.',
-                'Patient complains of persistent migraine for three days. Denies photophobia or dizziness. Administered sumatriptan.',
-                'Follow-up for coronary artery disease. No evidence of myocardial infarction. Patient tolerating aspirin and atorvastatin well.',
-                'Patient presents with right knee pain following a fall. No fracture identified on X-ray. Diagnosed with ligament strain and started on ibuprofen.'
+                'Patient presents with severe hypertension and shortness of breath. No chest pain.',
+                'Patient reports no history of severe headaches or seizures. Normal EEG findings.'
             ]
-        }
-        df = pd.DataFrame(data)
+        })
+        return df
 
-    df = df.dropna(subset=['transcription']).copy()
-    df = df.drop_duplicates(subset=['transcription']).copy()
-    df['transcription'] = df['transcription'].apply(lambda x: " ".join(x.split()))
+    # Standardize column names (lowercase and strip whitespace)
+    df.columns = [str(col).strip().lower() for col in df.columns]
+
+    # Clean missing critical fields
+    if 'transcription' in df.columns:
+        df = df.dropna(subset=['transcription'])
+        df = df[df['transcription'].str.strip() != '']
+    else:
+        df['transcription'] = "No transcription provided."
+
+    # Fill default values for optional columns
+    if 'medical_specialty' in df.columns:
+        df['medical_specialty'] = df['medical_specialty'].fillna('Unassigned / Unknown').str.strip()
+    else:
+        df['medical_specialty'] = 'Unassigned / Unknown'
+
+    if 'description' in df.columns:
+        df['description'] = df['description'].fillna('No description provided.').str.strip()
+    else:
+        df['description'] = 'No description provided.'
+
+    # Ensure 'note_id' column exists explicitly
+    if 'note_id' not in df.columns:
+        if 'id' in df.columns:
+            df['note_id'] = df['id']
+        elif 'unnamed: 0' in df.columns:
+            df['note_id'] = df['unnamed: 0']
+        else:
+            df = df.reset_index(drop=True)
+            df['note_id'] = df.index + 1
+
+    # Ensure note_id is numeric
+    df['note_id'] = pd.to_numeric(df['note_id'], errors='coerce').fillna(0).astype(int)
+
     return df
-
-def run_eda(df: pd.DataFrame):
-    df['word_count'] = df['transcription'].apply(lambda x: len(x.split()))
-    print("=== Note Statistics ===")
-    print(df[['medical_specialty', 'word_count']].describe())
-    
-    plt.figure(figsize=(10, 4))
-    sns.countplot(data=df, y='medical_specialty', order=df['medical_specialty'].value_counts().index)
-    plt.title('Notes Count by Medical Specialty')
-    plt.xlabel('Count')
-    plt.ylabel('Specialty')
-    plt.tight_layout()
-    plt.show()
-
-if __name__ == "__main__":
-    df = load_and_clean_data()
-    run_eda(df)
