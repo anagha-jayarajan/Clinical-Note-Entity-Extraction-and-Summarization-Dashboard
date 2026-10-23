@@ -1,5 +1,7 @@
 # Clinical-Note-Entity-Extraction-and-Summarization-Dashboard
 
+Live demo : https://clinical-note-entity-extraction-and-summarization-dashboard-5q.streamlit.app/
+
 ## Project Overview
 
 The **Clinical Natural Language Processing Analytics and Summarization Dashboard** is an end-to-end biomedical Natural Language Processing (NLP) application designed to extract clinically relevant information, identify negated medical findings, and generate concise summaries from clinical transcriptions. The project uses the MTSamples dataset and integrates biomedical NLP models, text summarization techniques, quantitative evaluation methods, and a SQLite analytical database into an interactive Streamlit dashboard.
